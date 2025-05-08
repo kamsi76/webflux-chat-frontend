@@ -26,7 +26,15 @@ export default function ChatMessage() {
         const selected = fetchedRooms.find((r) => r.id.toString() == roomId )
         if( selected ) {
             setCurrentRoom(selected)
-            setParticipants([currentUser, 'user1', 'user2'])
+
+            //채팅방에 입장처리 한다.
+            await chatRoomService.enterChatRoom(selected.id)
+
+            const participantsRes = await chatRoomService.selectParticipants(selected.id)
+            if (participantsRes.data.success) {
+              const names = participantsRes.data.data.map(u => u.nickname); // 또는 username
+              setParticipants(names);
+            }
 
             const messageRes = await chateMessageService.selectMessagesByRoomId(selected.id);
             if( messageRes.data.success ) {

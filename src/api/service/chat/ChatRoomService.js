@@ -22,6 +22,29 @@ class ChatRoomService {
     async createChatRoom(name) {
         return await axiosInstance.post(`/chat/chatroom?name=${encodeURIComponent(name)}`)
     }
+
+    async selectParticipants(roomId) {
+        return await axiosInstance.get(`/chat/chatroom/${roomId}/participants`)
+    }
+
+    /**
+     * 채팅방에 입장 처리 한다.
+     * @param {string} roomId 
+     * @returns 
+     */
+    async enterChatRoom(roomId) {
+        return await axiosInstance.post(`/chat/chatroom/${roomId}/enter`)
+    }
+
+    /**
+     * 채팅방에서 퇴장 처리 한다.
+     * @param {string} roomId 
+     * @returns 
+     */
+    async exitChatRoom(roomId) {
+        return await axiosInstance.delete(`/chat/chatroom/${roomId}/exit`)
+    }
+
 }
 
 export const chatRoomService = new ChatRoomService();
