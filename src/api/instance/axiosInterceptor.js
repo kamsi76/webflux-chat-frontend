@@ -37,7 +37,6 @@ axiosInstance.interceptors.response.use(
                 window.location.href = '/login';
             }
 
-
             // CommonError로 변환하고 던진다.
             return Promise.reject(new CommonError({ message, status, data }))
         } else {
