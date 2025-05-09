@@ -15,7 +15,14 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token')
-        debugger
+
+        // 전체 URL 로그 찍기
+        const fullUrl = `${config.baseURL || ''}${config.url || ''}`
+        console.log(`[요청 URL]: ${fullUrl}`)
+        console.log(`[요청 메서드]: ${config.method?.toUpperCase()}`)
+
+         console.log(token)
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`
         }
@@ -28,7 +35,6 @@ axiosInstance.interceptors.response.use(
     error => {
 
         console.log(error.response);
-        debugger
         if (error.response && error.response.data) {
             const { message, status, data } = error.response;
 

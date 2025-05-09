@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { authService } from "../../api/service/auth/AuthService";
+import { useNavigate } from "react-router-dom";
 
 function Login() {
+    
+    const navigate = useNavigate()
+
     const [form, setForm] = useState({username: '', password: ''})
     const [message, setMessage] = useState(null)
 
@@ -24,6 +28,7 @@ function Login() {
                 localStorage.setItem('user', JSON.stringify(user))
                 
                 setMessage('로그인 성공!!!')
+                navigate("/chatrooms")
             } else {
                 setMessage(response.data.message)
             }

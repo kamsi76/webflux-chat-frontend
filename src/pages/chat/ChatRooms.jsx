@@ -2,6 +2,10 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { chatRoomService } from "../../api/service/chat/ChatRoomService"
 
+/**
+ * 채팅방 목록 출력 화면
+ * @returns 
+ */
 function ChatRooms() {
 
     const [rooms, setRooms] = useState([]) //채팅방 목록
@@ -10,29 +14,27 @@ function ChatRooms() {
 
     const navigate = useNavigate()
 
+    //채팅방 목록을 조회한다.
     const loadRooms = async () => {
         try {
             const res = await chatRoomService.selectChatRoom();
 
-            console.log( res )
-            debugger
             if (res.data.success) {
                 setRooms(res.data.data)
             } else {
                 setMessage(res.data.message)
             }
         } catch (error) {
-            debugger
             setMessage(error.response?.data?.message || '오류 발생!!!')
         }
     }
-
 
     // 채팅방 목록 조회
     useEffect(() => {
         loadRooms()
     }, [])
 
+    // 채팅방 생성 처리
     const handleCreateRoom = async () => {
         if( !roomName.trim() ) return;
 
@@ -50,6 +52,7 @@ function ChatRooms() {
         }
     }
 
+    //채팅방 입장
     const enterRoom = (roomId) => {
         navigate(`/chat/${roomId}`)
     }

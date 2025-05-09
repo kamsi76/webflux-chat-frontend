@@ -5,60 +5,85 @@ import { chateMessageService } from '../../api/service/chat/chateMessageService'
 
 export default function ChatMessage() {
 
-  const { roomId } = useParams();
+  const { roomId } = useParams(); // URL 파라미터에서 roomId를 가져온다.
 
-  const [rooms, setRooms] = useState([]);
-  const [currentRoom, setCurrentRoom] = useState({});
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [rooms, setRooms] = useState([]); // 채팅방 목록
+  const [currentRoom, setCurrentRoom] = useState({}); // 현재 선택된 채팅방
+  const [messages, setMessages] = useState([]); // 채팅 메시지 목록
+  const [input, setInput] = useState(''); // 메시지 입력값
   const [currentUser] = useState('myUsername'); // 예시 사용자
-  const [participants, setParticipants] = useState([]);
-  const socketRef = useRef(null);
-  const messageEndRef = useRef();
+  const [participants, setParticipants] = useState([]); // 채팅방 참여자 목록
+  const socketRef = useRef(null); // WebSocket 참조
+  const messageEndRef = useRef(); // 메시지 목록 끝 참조
 
-  useEffect(() => {
+  /**
+   * 채팅방 목록을 조회한다.
+   */
+  async function loadRooms() {
 
-    async function loadRooms() {
-        const res = await chatRoomService.selectChatRoom()
-        const fetchedRooms = res.data.data;
-        setRooms(fetchedRooms)
+    // 채팅방 입장처리 한다.
+    await chatRoomService.enterChatRoom(roomId);
 
-        const selected = fetchedRooms.find((r) => r.id.toString() == roomId )
-        if( selected ) {
-            setCurrentRoom(selected)
+    // 내가 입장한 채팅방 목록을 조회한다.
+    const res = await chatRoomService.selectMyChatRoom()
+    const fetchedRooms = res.data.data;
+    setRooms(fetchedRooms)
 
-            //채팅방에 입장처리 한다.
-            await chatRoomService.enterChatRoom(selected.id)
+    // 현재 입장한 채팅방 정보
+    const selected = fetchedRooms.find((r) => r.id.toString() == roomId )
+    if( selected ) {
+      
+        setCurrentRoom(selected)
 
-            const participantsRes = await chatRoomService.selectParticipants(selected.id)
-            if (participantsRes.data.success) {
-              const names = participantsRes.data.data.map(u => u.nickname); // 또는 username
-              setParticipants(names);
-            }
+        // 채팅방에 입장 중인 참여자 정보를 조회한다.
+        const participantsRes = await chatRoomService.selectParticipants(selected.id)
+        if (participantsRes.data.success) {
+          const names = participantsRes.data.data.map(u => u.nickname); // 또는 username
+          setParticipants(names);
+        }
 
-            const messageRes = await chateMessageService.selectMessagesByRoomId(selected.id);
-            if( messageRes.data.success ) {
-              setMessages(messageRes.data.data)
-            }
-
+        // 채팅방에 있는 메시지 목록을 조회한다.
+        const messageRes = await chateMessageService.selectMessagesByRoomId(selected.id);
+        if( messageRes.data.success ) {
+          setMessages(messageRes.data.data)
         }
     }
+  }
 
-    loadRooms()
-
-  }, [roomId]);
-
-  useEffect(() => {
-    if (!roomId) return;
+  /**
+   * WebSocket 연결을 초기화한다.
+   */
+  async function initWebSocket() {
+    // WebSocket 연결을 초기화한다.
     const socket = new WebSocket(`ws://localhost:8080/ws/chat/${roomId}`);
     socketRef.current = socket;
+    socket.onopen = () => {
+      console.log('WebSocket 연결 성공');
+    };
+
+    // WebSocket 메시지 전달 받은 경우
     socket.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       setMessages((prev) => [...prev, msg]);
     };
-    return () => socket.close();
+
+  }
+
+  useEffect(() => {
+    if (!roomId) return;
+
+    // WebSocket 연결을 초기화한다.
+    initWebSocket()
+
+    // 채팅방 목록을 조회한다.
+    loadRooms()
+
+    // Component가 unmount 될 때 WebSocket을 닫는다.
+    return () => socketRef.current.close();
+
   }, [roomId]);
 
+  // 메시지를 전송한다.
   const handleSend = () => {
     if (input.trim()) {
       const msg = {
@@ -66,16 +91,18 @@ export default function ChatMessage() {
         content: input,
         avatar: '/avatar.png',
       };
-      debugger
+
       socketRef.current.send(JSON.stringify(msg));
       setInput('');
     }
   };
 
+  // Enter 키로 메시지 전송
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleSend();
   };
 
+  // 메시지 목록이 변경될 때마다 스크롤을 맨 아래로 이동
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
