@@ -5,7 +5,10 @@ import { authService } from "../../api/service/auth/AuthService";
 function Signup() {
 
     const navigate = useNavigate();
-    
+
+    // 로그인 상태 확인 후 채팅방으로 이동
+    localStorage.getItem('token') && navigate("/chatrooms")
+        
     const [form, setForm] = useState({ username: '', password: '', nickname: '' })
     const [message, setMessage] = useState(null)
 

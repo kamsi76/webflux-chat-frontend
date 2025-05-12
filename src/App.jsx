@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { routeService } from './api/service/route/RouteService';
 
@@ -70,6 +70,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
         {/* 3. Route 목록을 Loof 돌리면서 route의 componentName에 해당하는 component를 조회한다. */}
         {routeList.length === 0 ? (
           <Route path="*" element={<div>라우트 불러오는 중...</div>} />

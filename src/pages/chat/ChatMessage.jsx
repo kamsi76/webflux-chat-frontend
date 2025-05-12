@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { chatRoomService } from '../../api/service/chat/ChatRoomService';
 import { chateMessageService } from '../../api/service/chat/chateMessageService';
 
@@ -11,10 +11,12 @@ export default function ChatMessage() {
   const [currentRoom, setCurrentRoom] = useState({}); // 현재 선택된 채팅방
   const [messages, setMessages] = useState([]); // 채팅 메시지 목록
   const [input, setInput] = useState(''); // 메시지 입력값
-  const [currentUser] = useState('myUsername'); // 예시 사용자
+  const [currentUser, setCurrentUser] = useState({}); // 사용자 정보
   const [participants, setParticipants] = useState([]); // 채팅방 참여자 목록
   const socketRef = useRef(null); // WebSocket 참조
   const messageEndRef = useRef(); // 메시지 목록 끝 참조
+
+  const navigate = useNavigate()
 
   /**
    * 채팅방 목록을 조회한다.
@@ -24,29 +26,34 @@ export default function ChatMessage() {
     // 채팅방 입장처리 한다.
     await chatRoomService.enterChatRoom(roomId);
 
+    
     // 내가 입장한 채팅방 목록을 조회한다.
     const res = await chatRoomService.selectMyChatRoom()
     const fetchedRooms = res.data.data;
     setRooms(fetchedRooms)
 
+    // 로그인한 사용자 정보
+    const user = localStorage.getItem('user')
+    setCurrentUser(JSON.parse(user))
+
     // 현재 입장한 채팅방 정보
-    const selected = fetchedRooms.find((r) => r.id.toString() == roomId )
-    if( selected ) {
-      
-        setCurrentRoom(selected)
+    const selected = fetchedRooms.find((r) => r.id.toString() == roomId)
+    if (selected) {
 
-        // 채팅방에 입장 중인 참여자 정보를 조회한다.
-        const participantsRes = await chatRoomService.selectParticipants(selected.id)
-        if (participantsRes.data.success) {
-          const names = participantsRes.data.data.map(u => u.nickname); // 또는 username
-          setParticipants(names);
-        }
+      setCurrentRoom(selected)
 
-        // 채팅방에 있는 메시지 목록을 조회한다.
-        const messageRes = await chateMessageService.selectMessagesByRoomId(selected.id);
-        if( messageRes.data.success ) {
-          setMessages(messageRes.data.data)
-        }
+      // 채팅방에 입장 중인 참여자 정보를 조회한다.
+      const participantsRes = await chatRoomService.selectParticipants(selected.id)
+      if (participantsRes.data.success) {
+        const participants = participantsRes.data.data; // 참여자 목록
+        setParticipants(participants);
+      }
+
+      // 채팅방에 있는 메시지 목록을 조회한다.
+      const messageRes = await chateMessageService.selectMessagesByRoomId(selected.id);
+      if (messageRes.data.success) {
+        setMessages(messageRes.data.data)
+      }
     }
   }
 
@@ -54,6 +61,12 @@ export default function ChatMessage() {
    * WebSocket 연결을 초기화한다.
    */
   async function initWebSocket() {
+
+    // 이전 WebSocket 연결이 있다면 닫는다.
+    if (socketRef.current) {
+      socketRef.current.close();
+    }    
+
     // WebSocket 연결을 초기화한다.
     const socket = new WebSocket(`ws://localhost:8080/ws/chat/${roomId}`);
     socketRef.current = socket;
@@ -64,22 +77,37 @@ export default function ChatMessage() {
     // WebSocket 메시지 전달 받은 경우
     socket.onmessage = (e) => {
       const msg = JSON.parse(e.data);
+
+       // roomId가 없는 경우 무시
+      if( !msg.roomId ) return;
+
+      // 메시지 수신 시 메시지 목록에 추가한다.
+      if (msg.roomId.toString() !== roomId.toString()) return;
+
       setMessages((prev) => [...prev, msg]);
     };
 
   }
 
   useEffect(() => {
+
     if (!roomId) return;
 
+    // 🔁 채팅방이 바뀔 때 메시지 초기화
+    setMessages([]);
+    
     // WebSocket 연결을 초기화한다.
     initWebSocket()
-
+    
     // 채팅방 목록을 조회한다.
     loadRooms()
-
+    
     // Component가 unmount 될 때 WebSocket을 닫는다.
-    return () => socketRef.current.close();
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
 
   }, [roomId]);
 
@@ -87,7 +115,7 @@ export default function ChatMessage() {
   const handleSend = () => {
     if (input.trim()) {
       const msg = {
-        sender: currentUser,
+        sender: currentUser.id,
         content: input,
         avatar: '/avatar.png',
       };
@@ -107,6 +135,16 @@ export default function ChatMessage() {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // sender id로 nickname 찾기
+  const getNickname = (senderId) => {
+    const found = participants.find(p => p.id == senderId);
+    return found ? found.nickname : `사용자(${senderId})`;
+  };
+
+  const handlerMoveRoom = (roomId) => {
+    navigate(`/chat/${roomId}`)
+  }
+
   return (
     <div className="flex h-screen">
       {/* 채팅방 목록 */}
@@ -114,7 +152,11 @@ export default function ChatMessage() {
         <h2 className="text-lg font-bold mb-4">채팅방</h2>
         <ul className="space-y-2">
           {rooms.map((room) => (
-            <li key={room.id} className="p-2 rounded bg-white shadow">
+            <li 
+              key={room.id} 
+              className="p-2 rounded bg-white shadow" 
+              onClick={() => handlerMoveRoom(room.id)}
+            >
               🗨️ {room.name}
             </li>
           ))}
@@ -126,13 +168,16 @@ export default function ChatMessage() {
         <div className="p-4 border-b bg-white shadow font-bold text-xl">📢 {currentRoom.name}</div>
         <div className="flex-1 flex flex-col p-4 overflow-y-auto space-y-4 bg-white">
           {messages.map((msg, idx) => {
-            const isMine = msg.sender === currentUser;
+            const isMine = msg.sender == currentUser.id; // 메시지의 발신자가 현재 사용자와 같은지 확인
             return (
               <div key={idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex items-end gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
                   <img src={msg.avatar} alt={msg.sender} className="w-8 h-8 rounded-full border shadow" />
                   <div className="flex flex-col max-w-[66%]">
-                    <p className={`text-xs text-gray-500 mb-1 ${isMine ? 'text-right' : 'text-left'}`}>{msg.sender}</p>
+                    <p className={`
+                        text-xs text-gray-500 mb-1 
+                        ${isMine ? 'text-right' : 'text-left'}`}
+                    >{getNickname(msg.sender)}</p> {/* 사용자 nickname 처리*/}
                     <div
                       className={`
                         px-4 py-2 rounded-xl shadow inline-block min-w-[10rem] break-words whitespace-normal 
@@ -165,8 +210,8 @@ export default function ChatMessage() {
       <div className="w-1/5 border-l bg-gray-50 p-4 overflow-y-auto">
         <h2 className="text-lg font-bold mb-4">참여자</h2>
         <ul className="space-y-2">
-          {participants.map((name, idx) => (
-            <li key={idx} className="p-2 bg-white rounded shadow">👤 {name}</li>
+          {participants.map((p, idx) => (
+            <li key={idx} className="p-2 bg-white rounded shadow">👤 {p.nickname}</li>
           ))}
         </ul>
       </div>
